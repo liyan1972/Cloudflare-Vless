@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>GrainTCP VLESS 高级组装面板 (自动识别国旗标签)</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 900px; margin: 20px auto; padding: 20px; background-color: #f4f6f9; color: #333; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h2, h3 { margin-top: 0; color: #0056b3; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
+        .form-row { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        .form-group { flex: 1; min-width: 220px; display: flex; flex-direction: column; }
+        label { font-weight: bold; margin-bottom: 6px; font-size: 14px; color: #495057; }
+        input[type="text"], select, textarea { padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 3px rgba(0,123,255,0.15); }
+        textarea { height: 140px; resize: vertical; font-family: monospace; }
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+        button { padding: 12px 24px; font-size: 14px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-primary:hover { background-color: #0056b3; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-success:hover { background-color: #218838; }
+        #output { width: 100%; height: 250px; font-family: monospace; background-color: #212529; color: #f8f9fa; border: none; padding: 15px; border-radius: 6px; font-size: 13px; margin-top: 10px; }
+        .status-msg { margin-top: 5px; font-size: 13px; font-weight: bold; }
+        .text-success { color: #28a745; }
+        .text-danger { color: #dc3545; }
+        .note { font-size: 12px; color: #6c757d; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+    <h2>GrainTCP VLESS 高级组装面板 (自动识别国旗标签)</h2>
+    
+    <div class="card">
+        <h3>1. 核心参数与自定义后端</h3>
+        <div class="form-row">
+            <div class="form-group" style="flex: 1.5;">
+                <label>你的 UUID (CFG.id):</label>
+                <input type="text" id="uuid" value="88888888-8888-8888-8888-888888888888">
+            </div>
+            <div class="form-group" style="flex: 1.5;">
+                <label>HOST / SNI 域名 (你的 Worker 域名):</label>
+                <input type="text" id="worker" value="你的Worker域名.workers.dev">
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label>核心路由模式:</label>
+                <select id="mode" onchange="toggleFields()">
+                    <option value="1">模式 1：纯 TCP 盲转发 (自定义 ProxyIP)</option>
+                    <option value="2">模式 2：TURN/UDP 隧道 (自定义 TurnIP)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group" id="proxyIpGroup">
+                <label>自定义 ProxyIP (落地 VPS 域名或 IP):</label>
+                <input type="text" id="customProxyIp" value="ProxyIP.SG.CMLiussss.net">
+                <div class="note">流量将路由至此 IP/域名 落地出网</div>
+            </div>
+            
+            <div class="form-group" id="turnIpGroup" style="display: none;">
+                <label>自定义 TurnIP (支持带账号格式):</label>
+                <input type="text" id="customTurnIp" value="test:test123@211.20.1.40:3478">
+                <div class="note">强制全量 UDP 走此隧道中转</div>
+            </div>
+
+            <div class="form-group" style="flex: 0.5; min-width: 120px;">
+                <label>Early Data 大小:</label>
+                <input type="text" id="edValue" value="2560">
+                <div class="note">不想开启填 0 即可</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>2. 前端接入 IP 池导入 (手动 / API 双模式)</h3>
+        <div class="note" style="margin-bottom: 10px; color: #e4a11b;">💡 支持解析带尾巴格式，例如：47.76.218.163#🇭🇰HK</div>
+        
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label>方案 A：从 API 定时 IP 池拉取 (URL):</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="apiUrl" style="flex: 1;" placeholder="请输入优选IP池的API链接">
+                <button class="btn-success" onclick="fetchFromApi()">API 获取并组装</button>
+            </div>
+            <div id="apiStatus" class="status-msg"></div>
+        </div>
+
+        <div class="form-group">
+            <label>方案 B：手动粘贴前端优选 IP / 域名列表 (一行一个):</label>
+            <textarea id="iplist" placeholder="47.76.218.163#🇭🇰HK&#10;47.57.181.17#🇭🇰HK&#10;8.210.29.68#🇺🇸US"></textarea>
+        </div>
+        
+        <div class="btn-group">
+            <button class="btn-primary" onclick="generateFromManual()">基于当前列表组装节点</button>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h3>3. 组装结果</h3>
+        <div style="justify-content: space-between; display: flex; align-items: center; margin-bottom: 5px;">
+            <span style="font-size: 14px; color: #6c757d;" id="nodeCount">当前生成节点数: 0</span>
+            <button style="padding: 5px 10px; font-size: 12px; background-color: #6c757d; color: white;" onclick="copyToClipboard()">一键全选复制</button>
+        </div>
+        <textarea id="output" readonly placeholder="等待组装完成..."></textarea>
+    </div>
+
+    <script>
+        function toggleFields() {
+            const mode = document.getElementById('mode').value;
+            if (mode === "1") {
+                document.getElementById('proxyIpGroup').style.display = "flex";
+                document.getElementById('turnIpGroup').style.display = "none";
+            } else {
+                document.getElementById('proxyIpGroup').style.display = "none";
+                document.getElementById('turnIpGroup').style.display = "flex";
+            }
+        }
+
+        function buildVlessLinks(ipArray) {
+            const uuid = document.getElementById('uuid').value.trim();
+            const worker = document.getElementById('worker').value.trim();
+            const mode = document.getElementById('mode').value;
+            const ed = document.getElementById('edValue').value.trim();
+            
+            let results = [];
+            let count = 1;
+            
+            for (let line of ipArray) {
+                let raw_line = line.trim();
+                if (!raw_line || raw_line.startsWith('//')) continue;
+
+                let cf_addr = raw_line;
+                let flag_tag = ""; // 用来存放提取出来的国旗后缀
+
+                // 【核心逻辑】：识别并切分 # 之后的国旗地区文本
+                if (raw_line.includes('#')) {
+                    let parts = raw_line.split('#');
+                    cf_addr = parts[0].trim();
+                    flag_tag = parts[1].trim();
+                }
+                
+                // 跳过带空格的无效行
+                if (!cf_addr || cf_addr.includes(' ')) continue; 
+                // 如果 IP 部分自带冒号端口，予以剥离保留纯 IP/域名
+                if (cf_addr.includes(':') && !cf_addr.startsWith('[')) {
+                    cf_addr = cf_addr.split(':')[0];
+                }
+
+                let raw_path = "";
+                let mode_name = "";
+                
+                // 拼接带 ed 的路径
+                if (mode === "1") {
+                    const proxyIp = document.getElementById('customProxyIp').value.trim();
+                    raw_path = (ed === "0" || ed === "") ? `/?ip=${proxyIp}` : `/?ip=${proxyIp}&ed=${ed}`;
+                    mode_name = "Proxy";
+                } else {
+                    const turnIp = document.getElementById('customTurnIp').value.trim();
+                    raw_path = (ed === "0" || ed === "") ? `/turn://${turnIp}` : `/turn://${turnIp}?ed=${ed}`;
+                    mode_name = "Turn";
+                }
+                
+                let encoded_path = encodeURIComponent(raw_path);
+                
+                // 【智能生成别名】：如果带国旗，别名开头加上方括号标签，否则使用普通别名
+                let prefix = flag_tag ? `[${flag_tag}]` : "";
+                let alias = `${prefix}GrainTCP-${mode_name}-${String(count).padStart(3, '0')}`;
+                
+                // 组装最终的 VLESS 链接
+                let vless_url = `vless://${uuid}@${cf_addr}:443?encryption=none&security=tls&sni=${worker}&type=ws&host=${worker}&path=${encoded_path}#${encodeURIComponent(alias)}`;
+                results.push(vless_url);
+                count++;
+            }
+            
+            document.getElementById('output').value = results.join('\n');
+            document.getElementById('nodeCount').innerText = `当前生成节点数: ${results.length}`;
+        }
+
+        function generateFromManual() {
+            const rawText = document.getElementById('iplist').value;
+            const ipLines = rawText.split('\n');
+            buildVlessLinks(ipLines);
+        }
+
+        async function fetchFromApi() {
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+            const statusDiv = document.getElementById('apiStatus');
+            if (!apiUrl) { statusDiv.className = "status-msg text-danger"; statusDiv.innerText = "请输入有效的 API 链接！"; return; }
+            statusDiv.className = "status-msg"; statusDiv.innerText = "正在请求 API 优选 IP 池...";
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error(`HTTP 错误! 状态码: ${response.status}`);
+                const textData = await response.text();
+                // 兼容换行符或逗号分隔的 API 返回格式
+                const ipLines = textData.split(/[\n\r,]+/);
+                if (ipLines.length === 0 || (ipLines.length === 1 && ipLines[0].trim() === "")) throw new Error("API 未返回有效数据");
+                buildVlessLinks(ipLines);
+                statusDiv.className = "status-msg text-success"; statusDiv.innerText = `成功组装了 ${ipLines.length} 个带国旗标签的自定义节点！`;
+            } catch (error) {
+                console.error(error);
+                statusDiv.className = "status-msg text-danger"; statusDiv.innerText = `同步失败: ${error.message}`;
+            }
+        }
+
+        function copyToClipboard() {
+            const outputArea = document.getElementById('output'); outputArea.select();
+            document.execCommand('copy'); alert('已全部复制！');
+        }
+    </script>
+</body>
+</html>
