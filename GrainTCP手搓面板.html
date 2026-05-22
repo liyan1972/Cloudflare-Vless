@@ -2,13 +2,13 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>GrainTCP VLESS 智能路径组装面板</title>
+    <title>GrainTCP VLESS 手搓面板</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 900px; margin: 20px auto; padding: 20px; background-color: #f4f6f9; color: #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 950px; margin: 20px auto; padding: 20px; background-color: #f4f6f9; color: #333; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
         h2, h3 { margin-top: 0; color: #0056b3; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
         .form-row { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
-        .form-group { flex: 1; min-width: 220px; display: flex; flex-direction: column; }
+        .form-group { flex: 1; min-width: 200px; display: flex; flex-direction: column; }
         label { font-weight: bold; margin-bottom: 6px; font-size: 14px; color: #495057; }
         input[type="text"], select, textarea { padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
         input:focus, select:focus, textarea:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 3px rgba(0,123,255,0.15); }
@@ -26,12 +26,12 @@
 </head>
 <body>
 
-    <h2>GrainTCP VLESS 智能路径组装面板 (自动净化空参数)</h2>
+    <h2>GrainTCP VLESS 手搓面板</h2>
     
     <div class="card">
         <h3>1. 核心参数与自定义后端</h3>
         <div class="form-row">
-            <div class="form-group" style="flex: 1.5;">
+            <div class="form-group" style="flex: 1.2;">
                 <label>你的 UUID (CFG.id):</label>
                 <input type="text" id="uuid" value="88888888-8888-8888-8888-888888888888">
             </div>
@@ -39,11 +39,16 @@
                 <label>HOST / SNI 域名 (你的 Worker 域名):</label>
                 <input type="text" id="worker" value="你的Worker域名.workers.dev">
             </div>
+            <div class="form-group" style="flex: 1.2;">
+                <label>自定义节点别名:</label>
+                <input type="text" id="customAlias" value="" placeholder="默认: GrainTCP-Proxy/Turn">
+                <div class="note">留空保持默认后缀，无序号</div>
+            </div>
             <div class="form-group" style="flex: 1;">
                 <label>核心路由模式:</label>
                 <select id="mode" onchange="toggleFields()">
-                    <option value="1">模式 1：纯 TCP 盲转发 (自定义 ProxyIP)</option>
-                    <option value="2">模式 2：TURN/UDP 隧道 (自定义 TurnIP)</option>
+                    <option value="1">模式 1：纯 TCP 盲转发 (ProxyIP)</option>
+                    <option value="2">模式 2：TURN/UDP 隧道 (TurnIP)</option>
                 </select>
             </div>
         </div>
@@ -57,8 +62,8 @@
                 <label>自定义 TurnIP (支持带账号格式):</label>
                 <input type="text" id="customTurnIp" value="" placeholder="例如: test:test123@211.20.1.40:3478">
             </div>
-            <div class="form-group" style="flex: 0.5; min-width: 120px;">
-                <label>Early Data 大小:</label>
+            <div class="form-group" style="flex: 0.3; min-width: 100px;">
+                <label>Early Data:</label>
                 <input type="text" id="edValue" value="2560">
             </div>
         </div>
@@ -157,9 +162,9 @@
             const worker = document.getElementById('worker').value.trim();
             const mode = document.getElementById('mode').value;
             const ed = document.getElementById('edValue').value.trim();
+            const userAlias = document.getElementById('customAlias').value.trim();
             
             let results = [];
-            let count = 1;
             
             for (let line of ipArray) {
                 let raw_line = line.trim();
@@ -178,40 +183,36 @@
                 if (cf_addr.includes(':') && !cf_addr.startsWith('[')) cf_addr = cf_addr.split(':')[0];
 
                 let raw_path = "";
-                let mode_name = "";
+                let default_mode_name = "";
                 
-                // 【核心修正逻辑】：动态判断输入框是否留空，智能优化 Path 拼接
                 if (mode === "1") {
                     const proxyIp = document.getElementById('customProxyIp').value.trim();
-                    mode_name = "Proxy";
+                    default_mode_name = "GrainTCP-Proxy";
                     
                     if (proxyIp === "") {
-                        // ProxyIP 为空（使用内置落地）
                         raw_path = (ed === "0" || ed === "") ? "/" : `/?ed=${ed}`;
                     } else {
-                        // ProxyIP 有值
                         raw_path = (ed === "0" || ed === "") ? `/?ip=${proxyIp}` : `/?ip=${proxyIp}&ed=${ed}`;
                     }
                 } else {
                     const turnIp = document.getElementById('customTurnIp').value.trim();
-                    mode_name = "Turn";
+                    default_mode_name = "GrainTCP-Turn";
                     
                     if (turnIp === "") {
-                        // TurnIP 为空（极端情况防御）
                         raw_path = (ed === "0" || ed === "") ? "/" : `/?ed=${ed}`;
                     } else {
-                        // TurnIP 有值
                         raw_path = (ed === "0" || ed === "") ? `/turn://${turnIp}` : `/turn://${turnIp}?ed=${ed}`;
                     }
                 }
                 
                 let encoded_path = encodeURIComponent(raw_path);
                 let prefix = flag_tag ? `[${flag_tag}]` : "";
-                let alias = `${prefix}GrainTCP-${mode_name}-${String(count).padStart(3, '0')}`;
+                
+                let core_name = userAlias !== "" ? userAlias : default_mode_name;
+                let alias = `${prefix}${core_name}`;
                 
                 let vless_url = `vless://${uuid}@${cf_addr}:443?encryption=none&security=tls&sni=${worker}&type=ws&host=${worker}&path=${encoded_path}#${encodeURIComponent(alias)}`;
                 results.push(vless_url);
-                count++;
             }
             
             document.getElementById('output').value = results.join('\n');
@@ -220,7 +221,7 @@
 
         function copyToClipboard() {
             const outputArea = document.getElementById('output'); outputArea.select();
-            document.execCommand('copy'); alert('已成功复制纯净路径节点！');
+            document.execCommand('copy'); alert('已成功复制手搓节点！');
         }
     </script>
 </body>
